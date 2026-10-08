@@ -84,3 +84,13 @@ best slot = argmin(road L1, then L2) = **B4**
 For an EV at V = (0,2), only the EV slots A7, B7, E1 and E2 are candidates, and E1 (entered from (0,5)) has the smallest road L1 distance (4).
 
 If the user clicks Don't Allocate, the recommended slot stays Available.
+
+## Deploying on Render
+
+1. Push this folder to a GitHub repository (with `app.py` at the repo root).
+2. In Render, create a new Web Service and connect the repository.
+3. Runtime: Python. Build command: `pip install -r requirements.txt`
+4. Start command: `gunicorn app:app`
+5. Choose the free instance type and deploy.
+
+Notes: the parking lot is kept in memory, so all visitors share one lot and it resets when the service restarts or wakes from sleep. Keep a single gunicorn worker (the default).
