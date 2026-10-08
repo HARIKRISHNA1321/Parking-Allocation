@@ -219,4 +219,16 @@ Contributions are welcome! Here's how to get started:
 
 ---
 
+## ☁️ Deploying on Render
+
+1. Push this folder to a GitHub repository (with `app.py` at the repo root).
+2. In Render, create a new **Web Service** and connect the repository.
+3. Runtime: **Python**. Build command: `pip install -r requirements.txt`
+4. Start command: `gunicorn app:app`
+5. Choose the free instance type and deploy.
+
+> **Note:** The parking lot is kept in memory, so all visitors share one lot and it resets when the service restarts or wakes from sleep. Keep a single gunicorn worker (the default).
+
+---
+
 *Built with ❤️ using Python & Flask*
