@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart Parking</title>
+<style>
+body{font-family:system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;max-width:1240px;margin:32px auto;padding:0 24px;background:#fff;color:#1f2430;line-height:1.5}
+h1{font-size:1.5rem;font-weight:600;letter-spacing:-.01em;margin:0 0 24px;text-align:center}
+h2{font-size:1rem;font-weight:600;border-bottom:1px solid #e3e6ec;padding-bottom:6px;margin:0 0 12px}
+.page{display:grid;grid-template-columns:minmax(0,700px) minmax(280px,420px);gap:48px;justify-content:center;align-items:start}
+@media(max-width:900px){.page{grid-template-columns:1fr}}
+label{margin-right:18px;color:#4b5263}
+select{font:inherit;padding:5px 8px;border:1px solid #d3d8e0;border-radius:6px;background:#fff;color:#1f2430}
+button{font:inherit;padding:7px 16px;cursor:pointer;margin:12px 8px 0 0;background:#fff;color:#1f2430;border:1px solid #d3d8e0;border-radius:6px}
+button:hover{background:#f3f5f8}
+button.primary{background:#1f2430;color:#fff;border-color:#1f2430}
+button.primary:hover{background:#363c4b}
+button:disabled{opacity:.4;cursor:not-allowed}
+.pos{margin:14px 0 0;color:#4b5263}
+.pos b{color:#1f2430;font-weight:600}
+.board{display:grid;grid-template-columns:28px repeat(8,1fr);gap:8px;margin-top:8px;align-items:center}
+.axis{text-align:center;color:#8a92a3;font-size:.85rem}
+.cell{aspect-ratio:1.2;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;font-weight:600;border:0;margin:0;padding:0}
+.cell small{font-size:.7rem;font-weight:400}
+.standard{background:#e8ebf2}
+.ev{background:#d5f0e3;color:#1d5c3f}
+.occupied{background:#c9ced9;color:#6b7385}
+.recommended{background:#f5b400;outline:3px solid #1f2430}
+.road{background:#f3f5f8;color:#fff;cursor:pointer;font:inherit;font-weight:600}
+.road:hover{background:#dbe7fd}
+.vehicle,.vehicle:hover{background:#3b82f6;color:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:18px;font-size:.85rem;color:#4b5263}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:middle;margin-right:6px}
+.note{color:#8a92a3;font-size:.8rem;margin:6px 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{border-bottom:1px solid #e3e6ec;padding:6px 8px;text-align:center}
+th{color:#6b7385;font-weight:500}
+tr.best{background:#fff4cf;font-weight:600}
+.msg{color:#c0392b}
+.muted{color:#8a92a3}
+pre{background:#f3f5f8;padding:10px;border-radius:6px;font-size:.85rem}
+.side h2:not(:first-child){margin-top:28px}
+.calc{max-width:820px;margin:0 auto}
+</style>
+</head>
+<body>
+<h1>Smart Parking</h1>
+<div class="page">
+
+<div>
+<h2>Parking Lot</h2>
+<div class="board">
+<span></span>
+{% for c in range(0,8) %}<span class="axis">{{ c }}</span>{% endfor %}
+{% for y in range(0,7) %}
+<span class="axis">{{ y }}</span>
+{% for x in range(0,8) %}
+{% if x==0 or y in (0,3,6) %}
+{% set here = vehicle and vehicle[0]==x and vehicle[1]==y %}
+<button type="button" class="cell road {{ 'vehicle' if here }}" data-x="{{ x }}" data-y="{{ y }}" title="Road ({{ x }},{{ y }})">{{ "V" if here }}</button>
+{% else %}
+{% set s = slots|selectattr("x","equalto",x)|selectattr("y","equalto",y)|first %}
+{% set rec = result and not allocated and s.id==result.best.id %}
+<div class="cell {{ 'recommended' if rec else 'occupied' if s.status=='Occupied' else 'ev' if s.type=='EV' else 'standard' }}">
+{{ s.id }}{% if s.type=='EV' %}<small>EV</small>{% endif %}
+</div>
+{% endif %}
+{% endfor %}
+{% endfor %}
+</div>
+<div class="legend">
+<span><i style="background:#e8ebf2"></i>Standard</span>
+<span><i style="background:#d5f0e3"></i>EV</span>
+<span><i style="background:#c9ced9"></i>Occupied</span>
+<span><i style="background:#f5b400"></i>Recommended</span>
+<span><i style="background:#3b82f6"></i>Vehicle V</span>
+<span><i style="background:#f3f5f8;border:1px solid #d3d8e0;box-sizing:border-box"></i>Road</span>
+</div>
+<p class="note">Column 0 and rows 0, 3 and 6 are the road: click a road cell to place the vehicle.</p>
+<p class="note">x = column 0-7 &middot; y = row 0-6 (road, A, B, road, D, E, road) &middot; so B3 = (3,2)</p>
+
+<form method="post">
+<button name="action" value="reset">Reset Parking Lot</button>
+</form>
+</div>
+
+<div class="side">
+<h2>Vehicle</h2>
+<form method="post">
+<label>Vehicle Type
+<select name="type">
+<option {{ "selected" if form.type=="Standard" }}>Standard</option>
+<option {{ "selected" if form.type=="EV" }}>EV</option>
+</select></label>
+<input type="hidden" name="x" id="x" value="{{ form.x }}">
+<input type="hidden" name="y" id="y" value="{{ form.y }}">
+<p class="pos">Vehicle position: <b id="pos">{% if form.y!="" %}({{ form.x }},{{ form.y }}){% else %}not set - click the road{% endif %}</b></p>
+<button class="primary" id="find" name="action" value="find" {{ "disabled" if form.y=="" }}>Find Best Slot</button>
+</form>
+{% if message %}<p class="msg">{{ message }}</p>{% endif %}
+
+{% if result %}
+{% set b = result.best %}
+<h2>Allocation Result</h2>
+<p>Recommended Slot: <b>{{ b.id }}</b><br>
+Road L1 Distance: {{ b.l1 }}<br>
+L2 Distance (straight line): {{ "%.2f"|format(b.l2) }}<br>
+Status: {{ "Allocated" if allocated else "Not allocated yet" }}</p>
+<p>Reason: Selected because it has the minimum road L1 distance among available compatible slots. The car must drive along the road and cannot pass through parking slots.
+{% if result.rows|selectattr("l1","equalto",b.l1)|list|length>1 %}
+Several slots shared the minimum road L1 distance, so the smallest L2 distance broke the tie.
+{% endif %}</p>
+
+{% if not allocated %}
+<form method="post">
+<input type="hidden" name="type" value="{{ form.type }}">
+<input type="hidden" name="x" value="{{ form.x }}">
+<input type="hidden" name="y" value="{{ form.y }}">
+<button class="primary" name="action" value="allocate">Allocate Slot {{ b.id }}</button>
+<button name="action" value="cancel">Don't Allocate</button>
+</form>
+{% endif %}
+
+{% else %}
+<h2>Allocation Result</h2>
+<p class="muted">The result and calculations will appear here.</p>
+{% endif %}
+</div>
+
+</div>
+
+{% if result %}
+{% set b = result.best %}
+<div class="calc">
+<h2 style="margin-top:36px">Calculations</h2>
+<p>Vehicle: V = ({{ result.vehicle[0] }},{{ result.vehicle[1] }}) &nbsp; Vehicle type: {{ form.type }}</p>
+<pre>d = S - V = (x_s - x_v, y_s - y_v)
+L2 = sqrt(d_x^2 + d_y^2)   (straight line, tie-break)
+Road L1 = sum of ||leg||_1 along the road to the entry cell + 1 step into the slot
+Direct L1 = |d_x| + |d_y|  (ignores the road, shown for comparison only)</pre>
+<table>
+<tr><th>Slot</th><th>S</th><th>S - V</th><th>Entry cell</th><th>Direct L1</th><th>Road L1</th><th>L2</th></tr>
+{% for r in result.rows %}
+<tr class="{{ 'best' if r.id==b.id }}">
+<td>{{ r.id }}</td><td>({{ r.x }},{{ r.y }})</td>
+<td>({{ r.diff[0] }},{{ r.diff[1] }})</td><td>({{ r.entry[0] }},{{ r.entry[1] }})</td><td>{{ r.direct_l1 }}</td><td>{{ r.l1 }}</td><td>{{ "%.2f"|format(r.l2) }}</td>
+</tr>
+{% endfor %}
+</table>
+<p>Best slot = argmin(road L1 distances, tie-break L2) = <b>{{ b.id }}</b></p>
+
+<h2 style="margin-top:28px">Route to {{ b.id }}</h2>
+<p>The car drives along the road to the entry cell {{ b.entry }}, then 1 step into the slot.</p>
+<table>
+<tr><th>Leg</th><th>From</th><th>To</th><th>d</th><th>||d||<sub>1</sub></th></tr>
+{% for leg in b.legs %}
+<tr><td>{{ loop.index }}</td><td>({{ leg.from[0] }},{{ leg.from[1] }})</td><td>({{ leg.to[0] }},{{ leg.to[1] }})</td>
+<td>({{ leg.d[0] }},{{ leg.d[1] }})</td><td>{{ leg.l1 }}</td></tr>
+{% endfor %}
+<tr><td>{{ b.legs|length+1 }}</td><td>({{ b.entry[0] }},{{ b.entry[1] }})</td><td>{{ b.id }} ({{ b.x }},{{ b.y }})</td><td>into slot</td><td>1</td></tr>
+</table>
+<p>Road L1 = {% for leg in b.legs %}{{ leg.l1 }} + {% endfor %}1 = <b>{{ b.l1 }}</b></p>
+{% if result.nearest.l1>b.l1 %}
+<p>Slot {{ result.nearest.id }} has the smallest direct L1 ({{ result.nearest.direct_l1 }}), but its road L1 is {{ result.nearest.l1 }} because the car cannot drive through parking slots. That is why {{ b.id }} is chosen.</p>
+{% endif %}
+</div>
+{% endif %}
+
+<script>
+var roads=document.querySelectorAll(".road");
+roads.forEach(function(cell){
+  cell.addEventListener("click",function(){
+    roads.forEach(function(r){r.classList.remove("vehicle");r.textContent=""});
+    cell.classList.add("vehicle");
+    cell.textContent="V";
+    document.getElementById("x").value=cell.dataset.x;
+    document.getElementById("y").value=cell.dataset.y;
+    document.getElementById("pos").textContent="("+cell.dataset.x+","+cell.dataset.y+")";
+    document.getElementById("find").disabled=false;
+  });
+});
+</script>
+</body>
+</html>
